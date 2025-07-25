@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualizador de XML de Nota Fiscal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Define a fonte Inter para todo o corpo, com uma fallback para sans-serif */
+        body {
+            font-family: "Inter", sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 p-4">
+    <div class="container mx-auto bg-white p-6 rounded-lg shadow-lg max-w-4xl">
+        <h1 class="text-3xl font-bold text-blue-700 mb-6 pb-2 border-b-2 border-blue-200">Visualizador de XML de Nota Fiscal</h1>
+
+        <label for="xmlFile" class="block text-lg font-semibold text-gray-700 mb-4">Selecione o arquivo XML da Nota Fiscal:</label>
+        <input type="file" id="xmlFile" accept=".xml" onchange="processXML(event)"
+               class="block w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 cursor-pointer focus:outline-none file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+
+        <!-- Botão de Exportar para Excel, inicialmente oculto -->
+        <button id="exportExcelBtn"
+                class="mt-4 px-6 py-2 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-75 transition duration-300 ease-in-out hidden">
+            Exportar para Excel
+        </button>
+
+        <div id="errorMessage" class="text-red-600 font-bold mt-4 hidden"></div>
+
+        <div id="headerInfo" class="info-section bg-blue-50 p-4 rounded-lg border border-blue-200 mb-6 hidden">
+            <h2 class="text-xl font-semibold text-blue-800 mb-3 border-b border-blue-300 pb-2">Dados do Cabeçalho e Totais</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <div class="info-item"><strong class="text-blue-700 min-w-[150px] inline-block">Número da NF:</strong> <span id="nNF"></span></div>
+                <div class="info-item"><strong class="text-blue-700 min-w-[150px] inline-block">Série:</strong> <span id="serie"></span></div>
+                <div class="info-item"><strong class="text-blue-700 min-w-[150px] inline-block">Natureza da Operação:</strong> <span id="natOp"></span></div>
+                <div class="info-item"><strong class="text-blue-700 min-w-[150px] inline-block">Valor Total NF:</strong> <span id="vNF"></span></div>
+                <div class="info-item"><strong class="text-blue-700 min-w-[150px] inline-block">Total ICMS:</strong> <span id="vICMS"></span></div>
+                <div class="info-item"><strong class="text-blue-700 min-w-[150px] inline-block">Total IPI:</strong> <span id="vIPI"></span></div>
+                <div class="info-item"><strong class="text-blue-700 min-w-[150px] inline-block">Total PIS:</strong> <span id="vPIS"></span></div>
+                <div class="info-item"><strong class="text-blue-700 min-w-[150px] inline-block">Total COFINS:</strong> <span id="vCOFINS"></span></div>
+            </div>
+        </div>
+
+        <div id="emitInfo" class="info-section bg-green-50 p-4 rounded-lg border border-green-200 mb-6 hidden">
+            <h2 class="text-xl font-semibold text-green-800 mb-3 border-b border-green-300 pb-2">Dados do Emitente</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <div class="info-item"><strong class="text-green-700 min-w-[150px] inline-block">CNPJ:</strong> <span id="emitCNPJ"></span></div>
+                <div class="info-item"><strong class="text-green-700 min-w-[150px] inline-block">Nome:</strong> <span id="emitNome"></span></div>
+                <div class="info-item"><strong class="text-green-700 min-w-[150px] inline-block">Endereço:</strong> <span id="emitLogradouro"></span>, <span id="emitNumero"></span> <span id="emitComplemento"></span></div>
+                <div class="info-item"><strong class="text-green-700 min-w-[150px] inline-block">Bairro:</strong> <span id="emitBairro"></span></div>
+                <div class="info-item"><strong class="text-green-700 min-w-[150px] inline-block">Município:</strong> <span id="emitMunicipio"></span></div>
+                <div class="info-item"><strong class="text-green-700 min-w-[150px] inline-block">UF:</strong> <span id="emitUF"></span></div>
+                <div class="info-item"><strong class="text-green-700 min-w-[150px] inline-block">CEP:</strong> <span id="emitCEP"></span></div>
+                <div class="info-item"><strong class="text-green-700 min-w-[150px] inline-block">Telefone:</strong> <span id="emitFone"></span></div>
+            </div>
+        </div>
+
+        <div id="destInfo" class="info-section bg-purple-50 p-4 rounded-lg border border-purple-200 mb-6 hidden">
+            <h2 class="text-xl font-semibold text-purple-800 mb-3 border-b border-purple-300 pb-2">Dados do Destinatário</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <div class="info-item"><strong class="text-purple-700 min-w-[150px] inline-block">CNPJ/CPF:</strong> <span id="destCNPJ"></span></div>
+                <div class="info-item"><strong class="text-purple-700 min-w-[150px] inline-block">Nome:</strong> <span id="destNome"></span></div>
+                <div class="info-item"><strong class="text-purple-700 min-w-[150px] inline-block">Endereço:</strong> <span id="destLogradouro"></span>, <span id="destNumero"></span> <span id="destComplemento"></span></div>
+                <div class="info-item"><strong class="text-purple-700 min-w-[150px] inline-block">Bairro:</strong> <span id="destBairro"></span></div>
+                <div class="info-item"><strong class="text-purple-700 min-w-[150px] inline-block">Município:</strong> <span id="destMunicipio"></span></div>
+                <div class="info-item"><strong class="text-purple-700 min-w-[150px] inline-block">UF:</strong> <span id="destUF"></span></div>
+                <div class="info-item"><strong class="text-purple-700 min-w-[150px] inline-block">CEP:</strong> <span id="destCEP"></span></div>
+                <div class="info-item"><strong class="text-purple-700 min-w-[150px] inline-block">Telefone:</strong> <span id="destFone"></span></div>
+            </div>
+        </div>
+
+        <div id="productsInfo" class="info-section bg-yellow-50 p-4 rounded-lg border border-yellow-200 mb-6 hidden">
+            <h2 class="text-xl font-semibold text-yellow-800 mb-3 border-b border-yellow-300 pb-2">Produtos</h2>
+            <ul id="productList" class="product-list space-y-3">
+                <!-- Produtos serão inseridos aqui -->
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * Processa o arquivo XML selecionado pelo usuário.
+         * @param {Event} event - O evento de mudança do input de arquivo.
+         */
+        function processXML(event) {
+            const file = event.target.files[0]; // Gets the first selected file
+            const errorMessageDiv = document.getElementById('errorMessage');
+            errorMessageDiv.textContent = ''; // Clears previous error messages
+            errorMessageDiv.classList.add('hidden'); // Hides the error message
+
+            // If no file is selected, display a message and hide information sections
+            if (!file) {
+                showCustomMessage('Nenhum arquivo selecionado.', 'error');
+                hideAllSections();
+                return;
+            }
+
+            const reader = new FileReader(); // Creates a new file reader
+
+            // Defines the function to be executed when the file is loaded
+            reader.onload = function(e) {
+                const xmlString = e.target.result; // Gets the file content as a string
+                try {
+                    const parser = new DOMParser(); // Creates a new XML parser
+                    const xmlDoc = parser.parseFromString(xmlString, "application/xml"); // Parses the XML string
+
+                    // Checks if there was an error parsing the XML (e.g., malformed XML)
+                    if (xmlDoc.getElementsByTagName("parsererror").length > 0) {
+                        throw new Error("Erro ao analisar o arquivo XML. Verifique se o arquivo é válido.");
+                    }
+
+                    displayNFeInfo(xmlDoc); // Calls the function to display NFe information
+                    document.getElementById('exportExcelBtn').classList.remove('hidden'); // Shows the export button
+                } catch (error) {
+                    // In case of error, displays the error message and hides the sections
+                    showCustomMessage('Erro ao processar o XML: ' + error.message, 'error');
+                    hideAllSections();
+                    document.getElementById('exportExcelBtn').classList.add('hidden'); // Hides the export button
+                }
+            };
+
+            // Defines the function to be executed in case of an error reading the file
+            reader.onerror = function() {
+                showCustomMessage('Erro ao ler o arquivo.', 'error');
+                hideAllSections();
+                document.getElementById('exportExcelBtn').classList.add('hidden'); // Hides the export button
+            };
+
+            reader.readAsText(file); // Starts reading the file as text
+        }
+
+        /**
+         * Gets the text content of an XML tag.
+         * @param {Document} xmlDoc - The XML document.
+         * @param {string} tagName - The name of the tag to search for.
+         * @param {Element} [parentElement=xmlDoc] - The parent element where the search will be performed (optional, default is the entire document).
+         * @returns {string} The text content of the tag or 'Não encontrado' if the tag is not found.
+         */
+        function getTextContent(xmlDoc, tagName, parentElement = xmlDoc) {
+            // Searches for elements by tag name within the provided parent element
+            const elements = parentElement.getElementsByTagName(tagName);
+            // Returns the text content of the first element found or 'Não encontrado'
+            return elements.length > 0 ? elements[0].textContent : 'Não encontrado';
+        }
+
+        /**
+         * Formats a number as currency in Brazilian Portuguese.
+         * @param {string|number} value - The value to format.
+         * @returns {string} The formatted currency string.
+         */
+        function formatCurrency(value) {
+            const num = parseFloat(value);
+            if (isNaN(num)) {
+                return 'N/A';
+            }
+            return num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        }
+
+        /**
+         * Exibe as informações da Nota Fiscal no HTML.
+         * @param {Document} xmlDoc - O documento XML da Nota Fiscal.
+         */
+        function displayNFeInfo(xmlDoc) {
+            // Torna todas as seções visíveis
+            document.getElementById('headerInfo').classList.remove('hidden');
+            document.getElementById('emitInfo').classList.remove('hidden');
+            document.getElementById('destInfo').classList.remove('hidden');
+            document.getElementById('productsInfo').classList.remove('hidden');
+
+            // --- Dados do Cabeçalho (ide) ---
+            const ide = xmlDoc.getElementsByTagName('ide')[0]; // Obtém o elemento <ide>
+            if (ide) {
+                document.getElementById('nNF').textContent = getTextContent(xmlDoc, 'nNF', ide);
+                document.getElementById('serie').textContent = getTextContent(xmlDoc, 'serie', ide);
+                document.getElementById('natOp').textContent = getTextContent(xmlDoc, 'natOp', ide);
+            } else {
+                // Se <ide> não for encontrado, define os textos como 'Não encontrado'
+                document.getElementById('nNF').textContent = 'Não encontrado';
+                document.getElementById('serie').textContent = 'Não encontrado';
+                document.getElementById('natOp').textContent = 'Não encontrado';
+            }
+
+            // --- Dados de Totais (total, ICMSTot) ---
+            const total = xmlDoc.getElementsByTagName('total')[0];
+            if (total) {
+                const ICMSTot = total.getElementsByTagName('ICMSTot')[0];
+                if (ICMSTot) {
+                    document.getElementById('vNF').textContent = formatCurrency(getTextContent(xmlDoc, 'vNF', ICMSTot));
+                    document.getElementById('vICMS').textContent = formatCurrency(getTextContent(xmlDoc, 'vICMS', ICMSTot));
+                    document.getElementById('vIPI').textContent = formatCurrency(getTextContent(xmlDoc, 'vIPI', ICMSTot));
+                    document.getElementById('vPIS').textContent = formatCurrency(getTextContent(xmlDoc, 'vPIS', ICMSTot));
+                    document.getElementById('vCOFINS').textContent = formatCurrency(getTextContent(xmlDoc, 'vCOFINS', ICMSTot));
+                } else {
+                    document.getElementById('vNF').textContent = 'Não encontrado';
+                    document.getElementById('vICMS').textContent = 'Não encontrado';
+                    document.getElementById('vIPI').textContent = 'Não encontrado';
+                    document.getElementById('vPIS').textContent = 'Não encontrado';
+                    document.getElementById('vCOFINS').textContent = 'Não encontrado';
+                }
+            } else {
+                document.getElementById('vNF').textContent = 'Não encontrado';
+                document.getElementById('vICMS').textContent = 'Não encontrado';
+                document.getElementById('vIPI').textContent = 'Não encontrado';
+                document.getElementById('vPIS').textContent = 'Não encontrado';
+                document.getElementById('vCOFINS').textContent = 'Não encontrado';
+            }
+
+
+            // --- Dados do Emitente (emit) ---
+            const emit = xmlDoc.getElementsByTagName('emit')[0]; // Obtém o elemento <emit>
+            if (emit) {
+                document.getElementById('emitCNPJ').textContent = getTextContent(xmlDoc, 'CNPJ', emit);
+                document.getElementById('emitNome').textContent = getTextContent(xmlDoc, 'xNome', emit);
+                const emitEnder = emit.getElementsByTagName('enderEmit')[0]; // Obtém o elemento <enderEmit>
+                if (emitEnder) {
+                    document.getElementById('emitLogradouro').textContent = getTextContent(xmlDoc, 'xLgr', emitEnder);
+                    document.getElementById('emitNumero').textContent = getTextContent(xmlDoc, 'nro', emitEnder);
+                    document.getElementById('emitComplemento').textContent = getTextContent(xmlDoc, 'xCpl', emitEnder);
+                    document.getElementById('emitBairro').textContent = getTextContent(xmlDoc, 'xBairro', emitEnder);
+                    document.getElementById('emitMunicipio').textContent = getTextContent(xmlDoc, 'xMun', emitEnder);
+                    document.getElementById('emitUF').textContent = getTextContent(xmlDoc, 'UF', emitEnder);
+                    document.getElementById('emitCEP').textContent = getTextContent(xmlDoc, 'CEP', emitEnder);
+                } else {
+                    // Se <enderEmit> não for encontrado, define os textos como 'Não encontrado'
+                    document.getElementById('emitLogradouro').textContent = 'Não encontrado';
+                    document.getElementById('emitNumero').textContent = 'Não encontrado';
+                    document.getElementById('emitComplemento').textContent = 'Não encontrado';
+                    document.getElementById('emitBairro').textContent = 'Não encontrado';
+                    document.getElementById('emitMunicipio').textContent = 'Não encontrado';
+                    document.getElementById('emitUF').textContent = 'Não encontrado';
+                    document.getElementById('emitCEP').textContent = 'Não encontrado';
+                }
+                // A tag 'fone' geralmente fica diretamente dentro de 'emit' ou 'dest'
+                document.getElementById('emitFone').textContent = getTextContent(xmlDoc, 'fone', emit);
+            } else {
+                // Se <emit> não for encontrado, define os textos como 'Não encontrado'
+                document.getElementById('emitCNPJ').textContent = 'Não encontrado';
+                document.getElementById('emitNome').textContent = 'Não encontrado';
+                document.getElementById('emitFone').textContent = 'Não encontrado';
+            }
+
+            // --- Dados do Destinatário (dest) ---
+            const dest = xmlDoc.getElementsByTagName('dest')[0]; // Obtém o elemento <dest>
+            if (dest) {
+                // Tenta pegar CNPJ, se não encontrar, tenta CPF
+                document.getElementById('destCNPJ').textContent = getTextContent(xmlDoc, 'CNPJ', dest) || getTextContent(xmlDoc, 'CPF', dest);
+                document.getElementById('destNome').textContent = getTextContent(xmlDoc, 'xNome', dest);
+                const destEnder = dest.getElementsByTagName('enderDest')[0]; // Obtém o elemento <enderDest>
+                if (destEnder) {
+                    document.getElementById('destLogradouro').textContent = getTextContent(xmlDoc, 'xLgr', destEnder);
+                    document.getElementById('destNumero').textContent = getTextContent(xmlDoc, 'nro', destEnder);
+                    document.getElementById('destComplemento').textContent = getTextContent(xmlDoc, 'xCpl', destEnder);
+                    document.getElementById('destBairro').textContent = getTextContent(xmlDoc, 'xBairro', destEnder);
+                    document.getElementById('destMunicipio').textContent = getTextContent(xmlDoc, 'xMun', destEnder);
+                    document.getElementById('destUF').textContent = getTextContent(xmlDoc, 'UF', destEnder);
+                    document.getElementById('destCEP').textContent = getTextContent(xmlDoc, 'CEP', destEnder);
+                } else {
+                    // Se <enderDest> não for encontrado, define os textos como 'Não encontrado'
+                    document.getElementById('destLogradouro').textContent = 'Não encontrado';
+                    document.getElementById('destNumero').textContent = 'Não encontrado';
+                    document.getElementById('destComplemento').textContent = 'Não encontrado';
+                    document.getElementById('destBairro').textContent = 'Não encontrado';
+                    document.getElementById('destMunicipio').textContent = 'Não encontrado';
+                    document.getElementById('destUF').textContent = 'Não encontrado';
+                    document.getElementById('destCEP').textContent = 'Não encontrado';
+                }
+                document.getElementById('destFone').textContent = getTextContent(xmlDoc, 'fone', dest);
+            } else {
+                // Se <dest> não for encontrado, define os textos como 'Não encontrado'
+                document.getElementById('destCNPJ').textContent = 'Não encontrado';
+                document.getElementById('destNome').textContent = 'Não encontrado';
+                document.getElementById('destFone').textContent = 'Não encontrado';
+            }
+
+            // --- Produtos (det) ---
+            const productListUl = document.getElementById('productList');
+            productListUl.innerHTML = ''; // Limpa a lista de produtos existente
+
+            // Obtém todos os elementos <det> (que representam os itens da nota)
+            const dets = xmlDoc.getElementsByTagName('det');
+            if (dets.length > 0) {
+                for (let i = 0; i < dets.length; i++) {
+                    const det = dets[i];
+                    // A tag <prod> contém as informações detalhadas do produto dentro de cada <det>
+                    const prod = det.getElementsByTagName('prod')[0];
+                    
+                    if (prod) {
+                        const cProd = getTextContent(xmlDoc, 'cProd', prod); // Código do produto
+                        const xProd = getTextContent(xmlDoc, 'xProd', prod); // Descrição do produto
+                        const qCom = getTextContent(xmlDoc, 'qCom', prod);   // Quantidade comercial
+                        const cEAN = getTextContent(xmlDoc, 'cEAN', prod);   // GTIN (EAN) do produto
+                        const vUnCom = getTextContent(xmlDoc, 'vUnCom', prod); // Valor unitário de comercialização
+                        const vProd = getTextContent(xmlDoc, 'vProd', prod);   // Valor total do produto
+
+                        // Cria um novo item de lista para cada produto
+                        const listItem = document.createElement('li');
+                        listItem.className = 'product-item bg-white p-3 rounded-md border border-gray-200 shadow-sm';
+                        listItem.innerHTML = `
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                <div class="info-item"><strong class="text-gray-700 min-w-[100px] inline-block">Código:</strong> ${cProd}</div>
+                                <div class="info-item"><strong class="text-gray-700 min-w-[100px] inline-block">Produto:</strong> ${xProd}</div>
+                                <div class="info-item"><strong class="text-gray-700 min-w-[100px] inline-block">Quantidade:</strong> ${qCom}</div>
+                                <div class="info-item"><strong class="text-gray-700 min-w-[100px] inline-block">EAN:</strong> ${cEAN}</div>
+                                <div class="info-item"><strong class="text-gray-700 min-w-[100px] inline-block">Valor Unitário:</strong> ${formatCurrency(vUnCom)}</div>
+                                <div class="info-item"><strong class="text-gray-700 min-w-[100px] inline-block">Valor Total:</strong> ${formatCurrency(vProd)}</div>
+                            </div>
+                        `;
+                        productListUl.appendChild(listItem); // Adiciona o item à lista
+                    }
+                }
+            } else {
+                // Se nenhum produto for encontrado, exibe uma mensagem
+                const listItem = document.createElement('li');
+                listItem.textContent = 'Nenhum produto encontrado.';
+                productListUl.appendChild(listItem);
+            }
+        }
+
+        /**
+         * Esconde todas as seções de informações e o botão de exportar.
+         */
+        function hideAllSections() {
+            document.getElementById('headerInfo').classList.add('hidden');
+            document.getElementById('emitInfo').classList.add('hidden');
+            document.getElementById('destInfo').classList.add('hidden');
+            document.getElementById('productsInfo').classList.add('hidden');
+            document.getElementById('exportExcelBtn').classList.add('hidden'); // Esconde o botão de exportar
+        }
+
+        /**
+         * Função para exportar os dados da Nota Fiscal para um arquivo CSV.
+         */
+        function exportToExcel() {
+            const xmlFile = document.getElementById('xmlFile').files[0];
+            if (!xmlFile) {
+                showCustomMessage('Por favor, carregue um arquivo XML primeiro para exportar.', 'error');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const xmlString = e.target.result;
+                try {
+                    const parser = new DOMParser();
+                    const xmlDoc = parser.parseFromString(xmlString, "application/xml");
+
+                    if (xmlDoc.getElementsByTagName("parsererror").length > 0) {
+                        showCustomMessage("Erro ao analisar o arquivo XML para exportação. Verifique se o arquivo é válido.", 'error');
+                        return;
+                    }
+
+                    let csvContent = "";
+
+                    // Helper para adicionar uma linha ao CSV, escapando aspas duplas e usando ponto e vírgula como delimitador
+                    const addCsvRow = (dataArray) => {
+                        csvContent += dataArray.map(item => `"${String(item).replace(/"/g, '""')}"`).join(';') + '\n';
+                    };
+
+                    // --- Informações do Cabeçalho e Totais ---
+                    addCsvRow(["Informações do Cabeçalho e Totais"]);
+                    const ide = xmlDoc.getElementsByTagName('ide')[0];
+                    let nNFValue = 'Não encontrado'; // Variável para armazenar o número da NF para o nome do arquivo
+                    if (ide) {
+                        nNFValue = getTextContent(xmlDoc, 'nNF', ide);
+                        addCsvRow(["Número da NF", nNFValue]);
+                        addCsvRow(["Série", getTextContent(xmlDoc, 'serie', ide)]);
+                        addCsvRow(["Natureza da Operação", getTextContent(xmlDoc, 'natOp', ide)]);
+                    } else {
+                        addCsvRow(["Número da NF", "Não encontrado"]);
+                        addCsvRow(["Série", "Não encontrado"]);
+                        addCsvRow(["Natureza da Operação", "Não encontrado"]);
+                    }
+
+                    const total = xmlDoc.getElementsByTagName('total')[0];
+                    if (total) {
+                        const ICMSTot = total.getElementsByTagName('ICMSTot')[0];
+                        if (ICMSTot) {
+                            addCsvRow(["Valor Total NF", getTextContent(xmlDoc, 'vNF', ICMSTot)]);
+                            addCsvRow(["Total ICMS", getTextContent(xmlDoc, 'vICMS', ICMSTot)]);
+                            addCsvRow(["Total IPI", getTextContent(xmlDoc, 'vIPI', ICMSTot)]);
+                            addCsvRow(["Total PIS", getTextContent(xmlDoc, 'vPIS', ICMSTot)]);
+                            addCsvRow(["Total COFINS", getTextContent(xmlDoc, 'vCOFINS', ICMSTot)]);
+                        } else {
+                            addCsvRow(["Valor Total NF", "Não encontrado"]);
+                            addCsvRow(["Total ICMS", "Não encontrado"]);
+                            addCsvRow(["Total IPI", "Não encontrado"]);
+                            addCsvRow(["Total PIS", "Não encontrado"]);
+                            addCsvRow(["Total COFINS", "Não encontrado"]);
+                        }
+                    } else {
+                        addCsvRow(["Valor Total NF", "Não encontrado"]);
+                        addCsvRow(["Total ICMS", "Não encontrado"]);
+                        addCsvRow(["Total IPI", "Não encontrado"]);
+                        addCsvRow(["Total PIS", "Não encontrado"]);
+                        addCsvRow(["Total COFINS", "Não encontrado"]);
+                    }
+                    addCsvRow([]); // Linha em branco para separação
+
+                    // --- Informações do Emitente ---
+                    addCsvRow(["Informações do Emitente"]);
+                    const emit = xmlDoc.getElementsByTagName('emit')[0];
+                    if (emit) {
+                        addCsvRow(["CNPJ Emitente", getTextContent(xmlDoc, 'CNPJ', emit)]);
+                        addCsvRow(["Nome Emitente", getTextContent(xmlDoc, 'xNome', emit)]);
+                        const emitEnder = emit.getElementsByTagName('enderEmit')[0];
+                        if (emitEnder) {
+                            addCsvRow(["Endereço Emitente", `${getTextContent(xmlDoc, 'xLgr', emitEnder)}, ${getTextContent(xmlDoc, 'nro', emitEnder)} ${getTextContent(xmlDoc, 'xCpl', emitEnder)}`]);
+                            addCsvRow(["Bairro Emitente", getTextContent(xmlDoc, 'xBairro', emitEnder)]);
+                            addCsvRow(["Município Emitente", getTextContent(xmlDoc, 'xMun', emitEnder)]);
+                            addCsvRow(["UF Emitente", getTextContent(xmlDoc, 'UF', emitEnder)]);
+                            addCsvRow(["CEP Emitente", getTextContent(xmlDoc, 'CEP', emitEnder)]);
+                        } else {
+                            addCsvRow(["Endereço Emitente", "Não encontrado"]);
+                            addCsvRow(["Bairro Emitente", "Não encontrado"]);
+                            addCsvRow(["Município Emitente", "Não encontrado"]);
+                            addCsvRow(["UF Emitente", "Não encontrado"]);
+                            addCsvRow(["CEP Emitente", "Não encontrado"]);
+                        }
+                        addCsvRow(["Telefone Emitente", getTextContent(xmlDoc, 'fone', emit)]);
+                    } else {
+                        addCsvRow(["CNPJ Emitente", "Não encontrado"]);
+                        addCsvRow(["Nome Emitente", "Não encontrado"]);
+                        addCsvRow(["Endereço Emitente", "Não encontrado"]);
+                        addCsvRow(["Bairro Emitente", "Não encontrado"]);
+                        addCsvRow(["Município Emitente", "Não encontrado"]);
+                        addCsvRow(["UF Emitente", "Não encontrado"]);
+                        addCsvRow(["CEP Emitente", "Não encontrado"]);
+                        addCsvRow(["Telefone Emitente", "Não encontrado"]);
+                    }
+                    addCsvRow([]); // Linha em branco para separação
+
+                    // --- Informações do Destinatário ---
+                    addCsvRow(["Informações do Destinatário"]);
+                    const dest = xmlDoc.getElementsByTagName('dest')[0];
+                    if (dest) {
+                        addCsvRow(["CNPJ/CPF Destinatário", getTextContent(xmlDoc, 'CNPJ', dest) || getTextContent(xmlDoc, 'CPF', dest)]);
+                        addCsvRow(["Nome Destinatário", getTextContent(xmlDoc, 'xNome', dest)]);
+                        const destEnder = dest.getElementsByTagName('enderDest')[0];
+                        if (destEnder) {
+                            addCsvRow(["Endereço Destinatário", `${getTextContent(xmlDoc, 'xLgr', destEnder)}, ${getTextContent(xmlDoc, 'nro', destEnder)} ${getTextContent(xmlDoc, 'xCpl', destEnder)}`]);
+                            addCsvRow(["Bairro Destinatário", getTextContent(xmlDoc, 'xBairro', destEnder)]);
+                            addCsvRow(["Município Destinatário", getTextContent(xmlDoc, 'xMun', destEnder)]);
+                            addCsvRow(["UF Destinatário", getTextContent(xmlDoc, 'UF', destEnder)]);
+                            addCsvRow(["CEP Destinatário", getTextContent(xmlDoc, 'CEP', destEnder)]);
+                        } else {
+                            addCsvRow(["Endereço Destinatário", "Não encontrado"]);
+                            addCsvRow(["Bairro Destinatário", "Não encontrado"]);
+                            addCsvRow(["Município Destinatário", "Não encontrado"]);
+                            addCsvRow(["UF Destinatário", "Não encontrado"]);
+                            addCsvRow(["CEP Destinatário", "Não encontrado"]);
+                        }
+                        addCsvRow(["Telefone Destinatário", getTextContent(xmlDoc, 'fone', dest)]);
+                    } else {
+                        addCsvRow(["CNPJ/CPF Destinatário", "Não encontrado"]);
+                        addCsvRow(["Nome Destinatário", "Não encontrado"]);
+                        addCsvRow(["Endereço Destinatário", "Não encontrado"]);
+                        addCsvRow(["Bairro Destinatário", "Não encontrado"]);
+                        addCsvRow(["Município Destinatário", "Não encontrado"]);
+                        addCsvRow(["UF Destinatário", "Não encontrado"]);
+                        addCsvRow(["CEP Destinatário", "Não encontrado"]);
+                        addCsvRow(["Telefone Destinatário", "Não encontrado"]);
+                    }
+                    addCsvRow([]); // Linha em branco para separação
+
+                    // --- Produtos ---
+                    addCsvRow(["Produtos"]);
+                    addCsvRow(["Código do Produto", "Nome do Produto", "Quantidade", "EAN", "Valor Unitário", "Valor Total"]); // Cabeçalhos da tabela de produtos
+
+                    const dets = xmlDoc.getElementsByTagName('det');
+                    if (dets.length > 0) {
+                        for (let i = 0; i < dets.length; i++) {
+                            const det = dets[i];
+                            const prod = det.getElementsByTagName('prod')[0];
+                            if (prod) {
+                                const cProd = getTextContent(xmlDoc, 'cProd', prod);
+                                const xProd = getTextContent(xmlDoc, 'xProd', prod);
+                                const qCom = getTextContent(xmlDoc, 'qCom', prod);
+                                const cEAN = getTextContent(xmlDoc, 'cEAN', prod);
+                                const vUnCom = getTextContent(xmlDoc, 'vUnCom', prod);
+                                const vProd = getTextContent(xmlDoc, 'vProd', prod);
+                                addCsvRow([cProd, xProd, qCom, cEAN, vUnCom, vProd]);
+                            }
+                        }
+                    } else {
+                        addCsvRow(["Nenhum produto encontrado.", "", "", "", "", ""]);
+                    }
+
+                    // Define o nome do arquivo com o número da NF
+                    const filename = `export ${nNFValue}.csv`;
+
+                    // Cria um Blob (objeto de dados imutável) com o conteúdo CSV
+                    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                    const url = URL.createObjectURL(blob); // Cria uma URL para o Blob
+
+                    // Cria um elemento <a> temporário para disparar o download
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename; // Nome do arquivo a ser baixado
+                    document.body.appendChild(a); // Adiciona o link ao corpo do documento (necessário para clicar)
+                    a.click(); // Simula um clique no link para iniciar o download
+                    document.body.removeChild(a); // Remove o link temporário
+                    URL.revokeObjectURL(url); // Libera o objeto URL criado
+
+                    showCustomMessage(`Dados exportados com sucesso para ${filename}!`, 'info');
+
+                } catch (error) {
+                    showCustomMessage('Erro ao preparar os dados para exportação: ' + error.message, 'error');
+                }
+            };
+
+            reader.onerror = function() {
+                showCustomMessage('Erro ao ler o arquivo para exportação.', 'error');
+            };
+
+            reader.readAsText(xmlFile); // Inicia a leitura do arquivo para exportação
+        }
+
+        /**
+         * Exibe uma mensagem personalizada na tela (substituindo alert()).
+         * @param {string} message - A mensagem a ser exibida.
+         * @param {string} type - O tipo da mensagem ('info' para azul, 'error' para vermelho).
+         */
+        function showCustomMessage(message, type = 'info') {
+            const messageBox = document.createElement('div');
+            messageBox.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg text-white z-50`;
+            if (type === 'error') {
+                messageBox.classList.add('bg-red-500');
+            } else {
+                messageBox.classList.add('bg-blue-500');
+            }
+            messageBox.textContent = message;
+            document.body.appendChild(messageBox);
+
+            setTimeout(() => {
+                messageBox.remove();
+            }, 3000); // Remove a mensagem após 3 segundos
+        }
+
+        // Esconder as seções e o botão ao carregar a página inicialmente
+        document.addEventListener('DOMContentLoaded', () => {
+            hideAllSections();
+            // Adiciona o listener de evento para o botão de exportar
+            const exportBtn = document.getElementById('exportExcelBtn');
+            if (exportBtn) {
+                exportBtn.addEventListener('click', exportToExcel);
+            }
+        });
+    </script>
+</body>
+</html>
